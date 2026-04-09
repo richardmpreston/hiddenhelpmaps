@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hidden Help — On My Way</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 24px 20px;
+            min-height: 100vh;
+        }
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .label {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-bottom: 4px;
+        }
+        .value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .eta-label {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-bottom: 4px;
+            margin-top: 16px;
+        }
+        .eta-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--tg-theme-link-color, #2481cc);
+        }
+        .eta-mins {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-top: 2px;
+        }
+        .message-card {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .message-label {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-bottom: 8px;
+        }
+        .message-text {
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .btn-primary {
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+        .btn-primary:active { opacity: 0.8; }
+        .btn-secondary {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            color: var(--tg-theme-link-color, #2481cc);
+            border: 1px solid var(--tg-theme-link-color, #2481cc);
+        }
+        .status {
+            text-align: center;
+            padding: 40px 20px;
+            font-size: 15px;
+            color: var(--tg-theme-hint-color, #888);
+        }
+        .status-icon { font-size: 40px; margin-bottom: 12px; }
+        .error { color: #cc0000; }
+        #eta-section { display: none; }
+        #error-section { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="loading" class="status">
+        <div class="status-icon">📍</div>
+        <div>Getting your location...</div>
+    </div>
+
+    <div id="error-section" class="status">
+        <div class="status-icon">⚠️</div>
+        <div id="error-msg" class="error"></div>
+        <br>
+        <button class="btn btn-secondary" onclick="getLocation()">Try again</button>
+    </div>
+
+    <div id="eta-section">
+        <div class="card">
+            <div class="label" id="code-label"></div>
+            <div class="value" id="donor-name"></div>
+            <div class="eta-label">Estimated arrival</div>
+            <div class="eta-value" id="eta-time"></div>
+            <div class="eta-mins" id="eta-mins"></div>
+        </div>
+        <div class="message-card">
+            <div class="message-label">SMS message to donor</div>
+            <div class="message-text" id="sms-message"></div>
+        </div>
+        <a id="sms-btn" href="#" class="btn btn-primary">📱 Send SMS to donor</a>
+        <button class="btn btn-secondary" onclick="getLocation()">🔄 Recalculate ETA</button>
+    </div>
+
+    <script>
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+
+        const params  = new URLSearchParams(window.location.search);
+        const code    = params.get('code');
+        const donor   = params.get('donor') || 'Donor';
+        const number  = params.get('number');
+        const destLat = parseFloat(params.get('lat'));
+        const destLon = parseFloat(params.get('lon'));
+
+        const mobileMatch = number && number.match(/^07\d{9}$/);
+
+        if (!code || !mobileMatch || isNaN(destLat) || isNaN(destLon)) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error-section').style.display = 'block';
+            document.getElementById('error-msg').textContent =
+                !mobileMatch
+                    ? 'No valid UK mobile number found for this pickup.'
+                    : 'Missing parameters. Please use the button in the bot.';
+        } else {
+            document.getElementById('code-label').textContent  = code;
+            document.getElementById('donor-name').textContent  = donor;
+            getLocation();
+        }
+
+        function getLocation() {
+            document.getElementById('loading').style.display       = 'block';
+            document.getElementById('error-section').style.display = 'none';
+            document.getElementById('eta-section').style.display   = 'none';
+
+            if (!navigator.geolocation) {
+                showError('Geolocation is not supported on this device.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                pos => calculateETA(pos.coords.latitude, pos.coords.longitude),
+                err => {
+                    const msgs = {
+                        1: 'Location access denied. Please allow location access and try again.',
+                        2: 'Location unavailable. Please try again.',
+                        3: 'Location request timed out. Please try again.',
+                    };
+                    showError(msgs[err.code] || 'Could not get your location. Please try again.');
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+            );
+        }
+
+        function roundUpTo5(minutes) {
+            return Math.ceil(minutes / 5) * 5;
+        }
+
+        function formatTime(date) {
+            let h    = date.getHours();
+            let m    = date.getMinutes();
+            const ap = h >= 12 ? 'PM' : 'AM';
+            h        = h % 12 || 12;
+            return `${h}:${m.toString().padStart(2, '0')} ${ap}`;
+        }
+
+        async function calculateETA(driverLat, driverLon) {
+            const url = `https://router.project-osrm.org/route/v1/driving/` +
+                        `${driverLon},${driverLat};${destLon},${destLat}?overview=false`;
+            try {
+                const response = await fetch(url);
+                const data     = await response.json();
+                if (data.code !== 'Ok') {
+                    showError('Could not calculate route. Please try again.');
+                    return;
+                }
+                const durationMins = data.routes[0].duration / 60;
+                const etaMins      = roundUpTo5(durationMins);
+                const etaTime      = new Date(Date.now() + etaMins * 60 * 1000);
+                const etaStr       = formatTime(etaTime);
+                const smsBody      = `Hello ${donor}. We are on our way to collect your donated items ` +
+                                     `and should be arriving around ${etaStr}. ` +
+                                     `No need to respond to this message. See you later.`;
+
+                document.getElementById('eta-time').textContent    = etaStr;
+                document.getElementById('eta-mins').textContent    = `${etaMins} minutes from now`;
+                document.getElementById('sms-message').textContent = smsBody;
+                document.getElementById('sms-btn').href            = `sms:${number}&body=${encodeURIComponent(smsBody)}`;
+
+                document.getElementById('loading').style.display       = 'none';
+                document.getElementById('eta-section').style.display   = 'block';
+            } catch (err) {
+                showError('Network error calculating route. Please try again.');
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display       = 'none';
+            document.getElementById('eta-section').style.display   = 'none';
+            document.getElementById('error-section').style.display = 'block';
+            document.getElementById('error-msg').textContent       = msg;
+        }
+    </script>
+</body>
+</html>
