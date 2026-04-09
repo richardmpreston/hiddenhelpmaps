@@ -22,7 +22,7 @@
             background: var(--tg-theme-secondary-bg-color, #f5f5f5);
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         .ref {
             font-size: 13px;
@@ -32,20 +32,20 @@
         .client {
             font-size: 20px;
             font-weight: 600;
-            margin-bottom: 12px;
         }
         .eta-label {
             font-size: 13px;
             color: var(--tg-theme-hint-color, #888);
             margin-bottom: 4px;
+            margin-top: 16px;
         }
         .eta-value {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 700;
             color: var(--tg-theme-link-color, #2481cc);
         }
         .eta-mins {
-            font-size: 15px;
+            font-size: 14px;
             color: var(--tg-theme-hint-color, #888);
             margin-top: 2px;
         }
@@ -53,7 +53,7 @@
             background: var(--tg-theme-secondary-bg-color, #f5f5f5);
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         .message-label {
             font-size: 13px;
@@ -64,12 +64,10 @@
             font-size: 15px;
             line-height: 1.5;
         }
-        .send-btn {
+        .btn {
             display: block;
             width: 100%;
             padding: 16px;
-            background: var(--tg-theme-button-color, #2481cc);
-            color: var(--tg-theme-button-text-color, #ffffff);
             border: none;
             border-radius: 12px;
             font-size: 17px;
@@ -77,57 +75,154 @@
             cursor: pointer;
             text-decoration: none;
             text-align: center;
+            margin-bottom: 12px;
         }
-        .send-btn:active {
-            opacity: 0.8;
+        .btn-primary {
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
         }
-        .error {
-            color: #cc0000;
+        .btn-primary:active { opacity: 0.8; }
+        .btn-secondary {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            color: var(--tg-theme-link-color, #2481cc);
+            border: 1px solid var(--tg-theme-link-color, #2481cc);
+        }
+        .status {
             text-align: center;
             padding: 40px 20px;
             font-size: 15px;
+            color: var(--tg-theme-hint-color, #888);
         }
+        .status-icon { font-size: 40px; margin-bottom: 12px; }
+        .error { color: #cc0000; }
+        #eta-section { display: none; }
+        #error-section { display: none; }
     </style>
 </head>
 <body>
-    <div id="content"></div>
+
+    <div id="loading" class="status">
+        <div class="status-icon">📍</div>
+        <div>Getting your location...</div>
+    </div>
+
+    <div id="error-section" class="status">
+        <div class="status-icon">⚠️</div>
+        <div id="error-msg" class="error"></div>
+        <br>
+        <button class="btn btn-secondary" onclick="getLocation()">Try again</button>
+    </div>
+
+    <div id="eta-section">
+        <div class="card">
+            <div class="ref" id="ref-label"></div>
+            <div class="client" id="client-name"></div>
+            <div class="eta-label">Estimated arrival</div>
+            <div class="eta-value" id="eta-time"></div>
+            <div class="eta-mins" id="eta-mins"></div>
+        </div>
+        <div class="message-card">
+            <div class="message-label">SMS message to client</div>
+            <div class="message-text" id="sms-message"></div>
+        </div>
+        <a id="sms-btn" href="#" class="btn btn-primary">📱 Send SMS to client</a>
+        <button class="btn btn-secondary" onclick="getLocation()">🔄 Recalculate ETA</button>
+    </div>
 
     <script>
-        // Initialise Telegram Web App
         if (window.Telegram && window.Telegram.WebApp) {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
         }
 
-        // Parse URL parameters
-        const params = new URLSearchParams(window.location.search);
+        const params  = new URLSearchParams(window.location.search);
         const ref     = params.get('ref');
-        const client  = params.get('client');
+        const client  = params.get('client') || 'Client';
         const number  = params.get('number');
-        const eta     = params.get('eta');
-        const mins    = params.get('mins');
-        const msg     = params.get('msg');
+        const destLat = parseFloat(params.get('lat'));
+        const destLon = parseFloat(params.get('lon'));
 
-        const content = document.getElementById('content');
-
-        if (!ref || !number || !eta || !msg) {
-            content.innerHTML = '<div class="error">⚠️ Missing parameters.<br>Please use the /eta command in the bot.</div>';
+        if (!ref || !number || isNaN(destLat) || isNaN(destLon)) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error-section').style.display = 'block';
+            document.getElementById('error-msg').textContent =
+                'Missing parameters. Please use the /sms command in the bot.';
         } else {
-            const smsLink = `sms:${number}&body=${encodeURIComponent(msg)}`;
-            content.innerHTML = `
-                <div class="card">
-                    <div class="ref">Ref ${ref}</div>
-                    <div class="client">${client || 'Client'}</div>
-                    <div class="eta-label">Estimated arrival</div>
-                    <div class="eta-value">${eta}</div>
-                    <div class="eta-mins">${mins} minutes from now</div>
-                </div>
-                <div class="message-card">
-                    <div class="message-label">SMS message to client</div>
-                    <div class="message-text">${msg}</div>
-                </div>
-                <a href="${smsLink}" class="send-btn">📱 Send SMS to client</a>
-            `;
+            document.getElementById('ref-label').textContent   = 'Ref ' + ref;
+            document.getElementById('client-name').textContent = client;
+            getLocation();
+        }
+
+        function getLocation() {
+            document.getElementById('loading').style.display       = 'block';
+            document.getElementById('error-section').style.display = 'none';
+            document.getElementById('eta-section').style.display   = 'none';
+
+            if (!navigator.geolocation) {
+                showError('Geolocation is not supported on this device.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                pos => calculateETA(pos.coords.latitude, pos.coords.longitude),
+                err => {
+                    const msgs = {
+                        1: 'Location access denied. Please allow location access and try again.',
+                        2: 'Location unavailable. Please try again.',
+                        3: 'Location request timed out. Please try again.',
+                    };
+                    showError(msgs[err.code] || 'Could not get your location. Please try again.');
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+            );
+        }
+
+        function roundUpTo5(minutes) {
+            return Math.ceil(minutes / 5) * 5;
+        }
+
+        function formatTime(date) {
+            let h    = date.getHours();
+            let m    = date.getMinutes();
+            const ap = h >= 12 ? 'PM' : 'AM';
+            h        = h % 12 || 12;
+            return `${h}:${m.toString().padStart(2, '0')} ${ap}`;
+        }
+
+        async function calculateETA(driverLat, driverLon) {
+            const url = `https://router.project-osrm.org/route/v1/driving/` +
+                        `${driverLon},${driverLat};${destLon},${destLat}?overview=false`;
+            try {
+                const response = await fetch(url);
+                const data     = await response.json();
+                if (data.code !== 'Ok') {
+                    showError('Could not calculate route. Please try again.');
+                    return;
+                }
+                const durationMins = data.routes[0].duration / 60;
+                const etaMins      = roundUpTo5(durationMins);
+                const etaTime      = new Date(Date.now() + etaMins * 60 * 1000);
+                const etaStr       = formatTime(etaTime);
+                const smsBody      = `Hello. Hidden Help drivers will be on their way to you soon ` +
+                                     `and should be arriving around ${etaStr}. ` +
+                                     `No need to respond to this message. See you later.`;
+
+                document.getElementById('eta-time').textContent    = etaStr;
+                document.getElementById('eta-mins').textContent    = `${etaMins} minutes from now`;
+                document.getElementById('sms-message').textContent = smsBody;
+                document.getElementById('sms-btn').href            = `sms:${number}&body=${encodeURIComponent(smsBody)}`;
+
+                document.getElementById('loading').style.display       = 'none';
+                document.getElementById('eta-section').style.display   = 'block';
+            } catch (err) {
+                showError('Network error calculating route. Please try again.');
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display       = 'none';
+            document.getElementById('eta-section').style.display   = 'none';
+            document.getElementById('error-section').style.display = 'block';
+            document.getElementById('error-msg').textContent       = msg;
         }
     </script>
 </body>
