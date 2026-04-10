@@ -206,7 +206,8 @@
                 const etaMins      = roundUpTo5(durationMins);
                 const etaTime      = new Date(Date.now() + etaMins * 60 * 1000);
                 const etaStr       = formatTime(etaTime);
-                const smsBody      = `Hello ${donor}. We are on our way to collect your donated items ` +
+                const firstName     = donor.split(' ')[0];
+                const smsBody      = `Hello ${firstName}. We are on our way to collect your donated items ` +
                                      `and should be arriving around ${etaStr}. ` +
                                      `No need to respond to this message. See you later.`;
 

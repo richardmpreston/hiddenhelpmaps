@@ -57,6 +57,7 @@
         .message-text {
             font-size: 15px;
             line-height: 1.5;
+            white-space: pre-wrap;
         }
         .btn {
             display: block;
@@ -137,11 +138,12 @@
                     ? 'No valid UK mobile number found for this pickup.'
                     : 'Missing parameters. Please use the button in the bot.';
         } else {
-            const smsBody = `Hello ${donor}. Sorry it's taken a while to get in touch. ` +
+            const firstName = donor.split(' ')[0];
+            const smsBody = `Hello ${firstName}. Sorry it's taken a while to get in touch. ` +
                 `We are delivering in your area today and would like to collect ` +
                 `the items you have kindly offered for donation. Please ` +
                 `could you call or message me on this number if this is ` +
-                `convenient? Many thanks.`;
+                `convenient? Many thanks.\n\n${items}`;
 
             document.getElementById('code-label').textContent   = code;
             document.getElementById('donor-name').textContent   = donor;
