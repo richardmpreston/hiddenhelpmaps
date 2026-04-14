@@ -176,8 +176,8 @@
             );
         }
 
-        function roundUpTo5(minutes) {
-            return Math.ceil(minutes / 5) * 5;
+        function roundUpTo5(date) {
+            return new Date(Math.ceil(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000));
         }
 
         function formatTime(date) {
@@ -199,9 +199,10 @@
                     return;
                 }
                 const durationMins = data.routes[0].duration / 60;
-                const etaMins      = roundUpTo5(durationMins);
-                const etaTime      = new Date(Date.now() + etaMins * 60 * 1000);
-                const etaStr       = formatTime(etaTime);
+                const etaTime      = new Date(Date.now() + durationMins * 60 * 1000);
+                const etaRounded   = roundUpTo5(etaTime);
+                const etaMins      = Math.round((etaRounded - Date.now()) / 60000);
+                const etaStr       = formatTime(etaRounded);
                 const smsBody      = `Hello. Hidden Help drivers will be on their way to you soon ` +
                                      `and should be arriving around ${etaStr}. ` +
                                      `No need to respond to this message. See you later.`;
