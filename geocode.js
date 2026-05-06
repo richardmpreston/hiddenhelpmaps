@@ -15,12 +15,14 @@ const AZURE_MAPS_URL = 'https://atlas.microsoft.com/search/address/json';
 /**
  * Geocode a free-text address using the Azure Maps Search API.
  *
- * @param {string} address   Full address or postcode to look up.
- * @param {string} apiKey    Your Azure Maps subscription key.
+ * @param {string} address         Full address or postcode to look up.
+ * @param {string} [apiKey]        Azure Maps subscription key. Defaults to AZURE_MAPS_PRIMARY_KEY env var.
  * @returns {Promise<{lat: number, lon: number, displayName: string}>}
  * @throws  {Error} if no result found or the API call fails.
  */
-export async function geocodeAddress(address, apiKey) {
+export async function geocodeAddress(address, apiKey = process.env.AZURE_MAPS_PRIMARY_KEY) {
+    if (!apiKey) throw new Error('No Azure Maps API key provided and AZURE_MAPS_PRIMARY_KEY is not set.');
+
     const params = new URLSearchParams({
         'api-version': '1.0',
         'subscription-key': apiKey,
