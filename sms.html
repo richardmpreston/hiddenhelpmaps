@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hidden Help</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* ── header ── */
+        .header {
+            margin-bottom: 24px;
+        }
+        .header-ref {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-bottom: 2px;
+        }
+        .header-name {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .header-number {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-top: 2px;
+        }
+
+        /* ── option buttons ── */
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border: none;
+            border-radius: 14px;
+            padding: 16px;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            margin-bottom: 10px;
+            color: var(--tg-theme-text-color, #000000);
+        }
+        .option:active { opacity: 0.75; }
+        .option-icon {
+            font-size: 26px;
+            flex-shrink: 0;
+            width: 36px;
+            text-align: center;
+        }
+        .option-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .option-desc {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            line-height: 1.3;
+        }
+
+        /* ── action screens ── */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--tg-theme-link-color, #2481cc);
+            font-size: 15px;
+            padding: 0 0 18px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .card-label {
+            font-size: 12px;
+            color: var(--tg-theme-hint-color, #888);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 8px;
+        }
+        .card-text {
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .card-meta {
+            font-size: 13px;
+            color: var(--tg-theme-hint-color, #888);
+            margin-top: 6px;
+        }
+
+        .eta-time {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--tg-theme-link-color, #2481cc);
+            margin-bottom: 2px;
+        }
+        .eta-mins {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #888);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+        .btn-primary:active { opacity: 0.8; }
+        .btn-secondary {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            color: var(--tg-theme-link-color, #2481cc);
+            border: 1px solid var(--tg-theme-link-color, #2481cc);
+        }
+
+        /* ── status (loading / error) ── */
+        .status {
+            text-align: center;
+            padding: 40px 10px;
+            font-size: 15px;
+            color: var(--tg-theme-hint-color, #888);
+        }
+        .status-icon { font-size: 40px; margin-bottom: 12px; }
+        .error-text { color: #cc0000; }
+    </style>
+</head>
+<body>
+
+    <!-- ── SCREEN: main menu ── -->
+    <div id="screen-main" class="screen active">
+        <div class="header">
+            <div class="header-ref" id="hdr-ref"></div>
+            <div class="header-name" id="hdr-name"></div>
+            <div class="header-number" id="hdr-number"></div>
+        </div>
+
+        <button class="option" onclick="show('screen-message')">
+            <div class="option-icon">💬</div>
+            <div>
+                <div class="option-title">Send a message</div>
+                <div class="option-desc">Open messaging app — type your own</div>
+            </div>
+        </button>
+
+        <button class="option" onclick="show('screen-avail')">
+            <div class="option-icon">❓</div>
+            <div>
+                <div class="option-title">Check availability</div>
+                <div class="option-desc" id="avail-desc"></div>
+            </div>
+        </button>
+
+        <button class="option" onclick="startETA()">
+            <div class="option-icon">🚗</div>
+            <div>
+                <div class="option-title">Send ETA</div>
+                <div class="option-desc">Calculate your arrival time and text them</div>
+            </div>
+        </button>
+    </div>
+
+    <!-- ── SCREEN: bare message ── -->
+    <div id="screen-message" class="screen">
+        <button class="back-btn" onclick="show('screen-main')">‹ Back</button>
+        <div class="card">
+            <div class="card-label">Messaging app will open for</div>
+            <div class="card-text" id="msg-name-display"></div>
+            <div class="card-meta" id="msg-number-display"></div>
+        </div>
+        <a id="bare-sms-btn" href="#" class="btn btn-primary">📱 Open messaging app</a>
+    </div>
+
+    <!-- ── SCREEN: availability ── -->
+    <div id="screen-avail" class="screen">
+        <button class="back-btn" onclick="show('screen-main')">‹ Back</button>
+        <div class="card">
+            <div class="card-label">Message preview</div>
+            <div class="card-text" id="avail-message"></div>
+        </div>
+        <a id="avail-sms-btn" href="#" class="btn btn-primary">📱 Send via messaging app</a>
+    </div>
+
+    <!-- ── SCREEN: ETA (loading) ── -->
+    <div id="screen-eta-loading" class="screen">
+        <button class="back-btn" onclick="show('screen-main')">‹ Back</button>
+        <div class="status">
+            <div class="status-icon">📍</div>
+            <div>Getting your location…</div>
+        </div>
+    </div>
+
+    <!-- ── SCREEN: ETA (error) ── -->
+    <div id="screen-eta-error" class="screen">
+        <button class="back-btn" onclick="show('screen-main')">‹ Back</button>
+        <div class="status">
+            <div class="status-icon">⚠️</div>
+            <div id="eta-error-msg" class="error-text"></div>
+        </div>
+        <button class="btn btn-secondary" onclick="startETA()">🔄 Try again</button>
+    </div>
+
+    <!-- ── SCREEN: ETA (result) ── -->
+    <div id="screen-eta-result" class="screen">
+        <button class="back-btn" onclick="show('screen-main')">‹ Back</button>
+        <div class="card">
+            <div class="card-label" id="eta-ref-label"></div>
+            <div class="card-text" id="eta-name-label"></div>
+            <div style="margin-top: 14px;">
+                <div class="card-label">Estimated arrival</div>
+                <div class="eta-time" id="eta-time"></div>
+                <div class="eta-mins" id="eta-mins"></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-label">Message preview</div>
+            <div class="card-text" id="eta-message"></div>
+        </div>
+        <a id="eta-sms-btn" href="#" class="btn btn-primary">📱 Send via messaging app</a>
+        <button class="btn btn-secondary" onclick="startETA()">🔄 Recalculate ETA</button>
+    </div>
+
+    <!-- ── SCREEN: param error ── -->
+    <div id="screen-param-error" class="screen">
+        <div class="status">
+            <div class="status-icon">⚠️</div>
+            <div class="error-text">Missing parameters. Please use the button in the bot.</div>
+        </div>
+    </div>
+
+    <script>
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+
+        // ── parse URL params ──────────────────────────────────────────────
+        const params  = new URLSearchParams(window.location.search);
+        const mode    = (params.get('mode') || 'delivery').toLowerCase();
+        const ref     = params.get('ref')    || params.get('code') || '';
+        const name    = params.get('name')   || '';
+        const number  = params.get('number') || '';
+        const destLat = parseFloat(params.get('lat'));
+        const destLon = parseFloat(params.get('lon'));
+
+        const firstName = name.split(' ')[0] || name;
+        const isDelivery = mode === 'delivery';
+        const contactLabel = isDelivery ? 'client' : 'donor';
+        const refLabel     = isDelivery ? 'Ref' : 'Code';
+
+        // ── validate ─────────────────────────────────────────────────────
+        if (!number || isNaN(destLat) || isNaN(destLon)) {
+            show('screen-param-error');
+        } else {
+            init();
+        }
+
+        function init() {
+            // header
+            document.getElementById('hdr-ref').textContent    = ref ? `${refLabel} ${ref}` : '';
+            document.getElementById('hdr-name').textContent   = name;
+            document.getElementById('hdr-number').textContent = number;
+
+            // availability description
+            document.getElementById('avail-desc').textContent = isDelivery
+                ? 'Ask if they can take delivery today'
+                : 'Ask if they are in to hand over items';
+
+            // bare message screen
+            document.getElementById('msg-name-display').textContent   = name;
+            document.getElementById('msg-number-display').textContent = number;
+            document.getElementById('bare-sms-btn').href = `sms:${number}`;
+
+            // availability message
+            const availBody = isDelivery
+                ? `Hello ${firstName}, this is Hidden Help. We would like to deliver today the items you have requested from us. Please can you confirm you are available to take delivery? Thank you.`
+                : `Hello ${firstName}, this is Hidden Help. We are in your area today and would like to collect the items you have kindly offered to donate. Please can you confirm you are available? Thank you.`;
+            document.getElementById('avail-message').textContent = availBody;
+            document.getElementById('avail-sms-btn').href =
+                `sms:${number}&body=${encodeURIComponent(availBody)}`;
+
+            // ETA screen ref/name
+            document.getElementById('eta-ref-label').textContent  = ref ? `${refLabel} ${ref}` : '';
+            document.getElementById('eta-name-label').textContent = name;
+        }
+
+        // ── screen switching ──────────────────────────────────────────────
+        const allScreens = [
+            'screen-main', 'screen-message', 'screen-avail',
+            'screen-eta-loading', 'screen-eta-error', 'screen-eta-result',
+            'screen-param-error'
+        ];
+
+        function show(id) {
+            allScreens.forEach(s => {
+                document.getElementById(s).classList.toggle('active', s === id);
+            });
+        }
+
+        // ── ETA ───────────────────────────────────────────────────────────
+        function startETA() {
+            show('screen-eta-loading');
+            if (!navigator.geolocation) {
+                showETAError('Geolocation is not supported on this device.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                pos => calculateETA(pos.coords.latitude, pos.coords.longitude),
+                err => {
+                    const msgs = {
+                        1: 'Location access denied. Please allow location access and try again.',
+                        2: 'Location unavailable. Please try again.',
+                        3: 'Location request timed out. Please try again.',
+                    };
+                    showETAError(msgs[err.code] || 'Could not get your location. Please try again.');
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+            );
+        }
+
+        async function calculateETA(driverLat, driverLon) {
+            const url = `https://router.project-osrm.org/route/v1/driving/` +
+                        `${driverLon},${driverLat};${destLon},${destLat}?overview=false`;
+            try {
+                const response = await fetch(url);
+                const data     = await response.json();
+                if (data.code !== 'Ok') {
+                    showETAError('Could not calculate route. Please try again.');
+                    return;
+                }
+                const durationMins = data.routes[0].duration / 60;
+                const etaTime      = new Date(Date.now() + durationMins * 60 * 1000);
+                const etaRounded   = roundUpTo5(etaTime);
+                const etaMins      = Math.round((etaRounded - Date.now()) / 60000);
+                const etaStr       = formatTime(etaRounded);
+
+                const smsBody = `Hello ${firstName}, this is Hidden Help. ` +
+                    (isDelivery
+                        ? `We are on our way to deliver your items and should arrive around ${etaStr}. `
+                        : `We are on our way to collect your donated items and should arrive around ${etaStr}. `) +
+                    `No need to respond to this message. See you shortly.`;
+
+                document.getElementById('eta-time').textContent    = etaStr;
+                document.getElementById('eta-mins').textContent    = `${etaMins} minutes from now`;
+                document.getElementById('eta-message').textContent = smsBody;
+                document.getElementById('eta-sms-btn').href =
+                    `sms:${number}&body=${encodeURIComponent(smsBody)}`;
+
+                show('screen-eta-result');
+            } catch (err) {
+                showETAError('Network error calculating route. Please try again.');
+            }
+        }
+
+        function showETAError(msg) {
+            document.getElementById('eta-error-msg').textContent = msg;
+            show('screen-eta-error');
+        }
+
+        function roundUpTo5(date) {
+            return new Date(Math.ceil(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000));
+        }
+
+        function formatTime(date) {
+            let h    = date.getHours();
+            let m    = date.getMinutes();
+            const ap = h >= 12 ? 'PM' : 'AM';
+            h        = h % 12 || 12;
+            return `${h}:${m.toString().padStart(2, '0')} ${ap}`;
+        }
+    </script>
+</body>
+</html>
